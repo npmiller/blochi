@@ -1,0 +1,9 @@
+%% -*- erlang -*-
+{application, blochi,
+ [{description, "blochi"},
+  {vsn, "0.1"},
+  {modules, []},
+  {registered, []},
+  {mod, {'blochi_app', []}},
+  {env, []},
+  {applications, [kernel, stdlib, crypto]}]}.
