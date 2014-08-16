@@ -12,49 +12,57 @@
 
 start(Options) ->
 	{[DocRoot, CacheRoot, StaticRoot], Options1} = get_options([docroot, cacheroot, staticroot], Options),
-    Loop = fun (Req) ->
-                   ?MODULE:loop(Req, DocRoot, StaticRoot, CacheRoot)
-           end,
-    mochiweb_http:start([{name, ?MODULE}, {loop, Loop} | Options1]).
+	Loop = fun (Req) ->
+				   ?MODULE:loop(Req, DocRoot, StaticRoot, CacheRoot)
+		   end,
+	mochiweb_http:start([{name, ?MODULE}, {loop, Loop} | Options1]).
 
 stop() ->
-    mochiweb_http:stop(?MODULE).
+	mochiweb_http:stop(?MODULE).
 
 loop(Req, DocRoot, StaticRoot, CacheRoot) ->
-    "/" ++ Path = Req:get(path),
-    try
-        case Req:get(method) of
-            Method when Method =:= 'GET'; Method =:= 'HEAD' ->
+	"/" ++ Path = Req:get(path),
+	try
+		case Req:get(method) of
+			Method when Method =:= 'GET'; Method =:= 'HEAD' ->
 				case string:tokens(Path, "/") of
-                    ["static" | EndPath] ->
+					["static" | EndPath] ->
 						Req:serve_file(EndPath, StaticRoot);
 					["raw" | EndPath] ->
 						Req:serve_file(EndPath, DocRoot);
-                    [] ->
-                        serve_md(Req, [], DocRoot, CacheRoot);
-                    Tokens ->
-                        serve_md(Req, filename:join(Tokens), DocRoot, CacheRoot)
-                end;
-            'POST' ->
-                case Path of
-                    _ ->
-                        Req:not_found()
-                end;
-            _ ->
-                Req:respond({501, [], []})
-        end
-    catch
-        Type:What ->
-            Report = ["web request failed",
-                      {path, Path},
-                      {type, Type}, {what, What},
-                      {trace, erlang:get_stacktrace()}],
-            error_logger:error_report(Report),
-            Req:respond({500, [{"Content-Type", "text/plain"}],
-                         "request failed, sorry\n"})
-    end.
+					[] ->
+						serve_md(Req, [], DocRoot, CacheRoot);
+					Tokens ->
+						serve_md(Req, filename:join(Tokens), DocRoot, CacheRoot)
+				end;
+			'POST' ->
+				case Path of
+					_ ->
+						Req:respond(get_error_page(404, DocRoot))
+				end;
+			_ ->
+				Req:respond(get_error_page(501, DocRoot))
+		end
+	catch
+		Type:What ->
+			Report = ["web request failed",
+				      {path, Path},
+				      {type, Type}, {what, What},
+				      {trace, erlang:get_stacktrace()}],
+			error_logger:error_report(Report),
+			Req:respond(get_error_page(500, DocRoot))
+	end.
 
 %% Internal API
+
+get_error_page(Error, DocRoot) ->
+	ErrorStr = integer_to_list(Error),
+	case file:read_file(filename:join([DocRoot, "_errors",[ErrorStr, ".html"]])) of
+		{error, _} ->
+			{Error, [{"Content-Type", "text/plain"}], ["Error: ", ErrorStr]};
+		{ok, Page} ->
+			{Error, [{"Content-Type", "text/html"}], Page}
+	end.
 
 get_options(Opt_list, Options) ->
 	Props = lists:map(fun(O) -> proplists:get_value(O, Options) end, Opt_list),
@@ -64,7 +72,7 @@ get_options(Opt_list, Options) ->
 serve_md(Req, Path, DocRoot, CacheRoot) ->
 	case mochiweb_util:safe_relative_path(Path) of
 		undefined -> 
-			Req:not_found();
+			Req:respond(get_error_page(404, DocRoot));
 		RelPath ->
 			case filelib:is_dir(filename:join([DocRoot, RelPath])) of
 				true ->
@@ -80,7 +88,7 @@ serve_md_file(Req, DocRoot, CacheRoot, RelPath) ->
 	TemplatePath = find_template(DocRoot, RelPath),
 	case check_cache(SourcePath, CachePath, TemplatePath) of
 		error ->
-			Req:not_found();
+			Req:respond(get_error_page(404, DocRoot));
 		render ->
 			render_md(SourcePath, CachePath, TemplatePath),
 			Req:serve_file([RelPath, ".html"], CacheRoot);
@@ -144,9 +152,9 @@ find_dir_template(DocRoot, DirPath) ->
 -include_lib("eunit/include/eunit.hrl").
 
 you_should_write_a_test() ->
-    ?assertEqual(
-       "No, but I will!",
-       "Have you written any tests?"),
-    ok.
+	?assertEqual(
+	   "No, but I will!",
+	   "Have you written any tests?"),
+	ok.
 
 -endif.
