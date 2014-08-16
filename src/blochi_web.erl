@@ -31,7 +31,7 @@ loop(Req, DocRoot, StaticRoot, CacheRoot) ->
 					["raw" | EndPath] ->
 						Req:serve_file(EndPath, DocRoot);
 					[] ->
-						serve_md(Req, [], DocRoot, CacheRoot);
+						serve_md(Req, "index", DocRoot, CacheRoot);
 					Tokens ->
 						serve_md(Req, filename:join(Tokens), DocRoot, CacheRoot)
 				end;
@@ -76,7 +76,7 @@ serve_md(Req, Path, DocRoot, CacheRoot) ->
 		RelPath ->
 			case filelib:is_dir(filename:join([DocRoot, RelPath])) of
 				true ->
-					serve_md_file(Req, DocRoot, CacheRoot, [RelPath, "index"]);
+					serve_md_file(Req, DocRoot, CacheRoot, filename:join([RelPath, "index"]));
 				false ->
 					serve_md_file(Req, DocRoot, CacheRoot, RelPath)
 			end
